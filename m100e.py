@@ -15,6 +15,7 @@ opens a debugger overlay (registers, disassembly, memory, breakpoints).
 """
 
 import argparse
+import os
 import sys
 import time
 
@@ -43,7 +44,15 @@ class App:
         if windowed:
             self.screen = pg.display.set_mode((1360, 932), pg.RESIZABLE)
         else:
-            self.screen = pg.display.set_mode((0, 0), pg.FULLSCREEN)
+            # Borderless window at desktop resolution instead of exclusive
+            # fullscreen: SDL's FULLSCREEN asks X11 for a video-mode switch,
+            # which some window managers time out on ("no window becoming
+            # fullscreen; reverting").  A borderless desktop-sized window
+            # looks identical and needs no mode switch.
+            os.environ.setdefault("SDL_VIDEO_WINDOW_POS", "0,0")
+            info = pg.display.Info()
+            self.screen = pg.display.set_mode(
+                (info.current_w, info.current_h), pg.NOFRAME)
 
         font_size = max(14, self.screen.get_height() // 54)
         path = pg.font.match_font("dejavusans,freesans,liberationsans,arial")
