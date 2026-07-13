@@ -28,8 +28,9 @@ DEFAULTS = {
     "system_rom": None,
     # path of an option ROM image loaded in the socket (None = empty)
     "option_rom": None,
-    # where PRINT/LPRINT output is captured
-    "printer_file": str(STATE_DIR / "printer.txt"),
+    # print jobs are rendered to PDFs in this folder
+    "printer_dir": str(pathlib.Path(__file__).resolve().parents[1]
+                       / "printer"),
 }
 
 

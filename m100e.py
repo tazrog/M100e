@@ -5,10 +5,13 @@ Run it and you are looking at a Model 100: the photo is the machine, the
 LCD area is the live 240x64 display, and your keyboard is wired into the
 key matrix.  Hover any key on the picture to see which real key drives it.
 Right-click (or Ctrl+F1) for the emulator menu: load programs and ROMs,
-change memory size, configure the modem/serial internet bridge.
+change memory size, configure the modem/serial internet bridge. Ctrl+F2
+opens a debugger overlay (registers, disassembly, memory, breakpoints).
 
     python3 m100e.py            fullscreen
     python3 m100e.py -w         windowed
+    python3 m100e.py -w --load prog.co         load a file at startup
+    python3 m100e.py -w --load prog.co --debug   ...with the debugger open
 """
 
 import argparse
@@ -22,14 +25,14 @@ from m100.config import Config
 from m100.files import RamFiles, FileError
 from m100.machine import Machine, CPU_HZ
 from m100.sound import Beeper
-from m100.ui import Skin, LcdRenderer, Bubble, Menu, StatusLine
+from m100.ui import Skin, LcdRenderer, Bubble, Menu, StatusLine, Debugger
 
 FRAME_HZ = 60
 RAM_SIZES = [8192, 16384, 24576, 32768]
 
 
 class App:
-    def __init__(self, windowed):
+    def __init__(self, windowed, load=None, debug=False):
         self.config = Config()
         self.status_cb = None  # set after StatusLine exists
 
@@ -51,6 +54,12 @@ class App:
             self.font = pg.font.Font(None, font_size + 6)
             self.small_font = pg.font.Font(None, font_size)
 
+        mono_path = pg.font.match_font(
+            "dejavusansmono,firacode,couriernew,consolas,monospace")
+        mono_size = max(13, self.screen.get_height() // 62)
+        self.mono_font = pg.font.Font(mono_path, mono_size) if mono_path \
+            else pg.font.Font(None, mono_size + 4)
+
         self.skin = Skin()
         self.skin.fit(self.screen.get_size())
         self.status = StatusLine(self.small_font)
@@ -65,6 +74,16 @@ class App:
         except pg.error as e:
             print("[m100e] no audio: %s" % e)
         self.files = RamFiles(self.machine)
+        self.debugger = Debugger(self.font, self.mono_font)
+        self.debugger.open = debug
+
+        if load:
+            try:
+                name = self.files.import_file(load)
+                self.machine.cpu.reset()  # warm boot so the menu picks it up
+                self.on_status("loaded %s" % name.strip())
+            except (FileError, OSError) as e:
+                self.on_status("load failed: %s" % e)
 
         opt = self.config["option_rom"]
         if opt:
@@ -288,6 +307,23 @@ class App:
         self.running = False
         return "close"
 
+    def act_toggle_breakpoint(self):
+        addr = self.ask_string(
+            "Breakpoint",
+            "Toggle breakpoint at address (hex, blank = current PC):", "")
+        if addr is None:
+            return
+        addr = addr.strip()
+        try:
+            a = self.machine.cpu.pc if not addr else int(addr, 16)
+        except ValueError:
+            self.on_status("not a hex address: %s" % addr)
+            return
+        self.debugger.toggle_breakpoint(a)
+        self.on_status("breakpoint %s @ %04X" % (
+            "set" if (a & 0xFFFF) in self.debugger.breakpoints else "cleared",
+            a & 0xFFFF))
+
     def open_menu(self):
         c = self.config
         m = self.machine
@@ -323,6 +359,35 @@ class App:
         if ev.type == pg.KEYDOWN:
             if ev.key == pg.K_F1 and ev.mod & pg.KMOD_CTRL:
                 self.open_menu()
+                return
+            if ev.key == pg.K_F2 and ev.mod & pg.KMOD_CTRL:
+                self.debugger.toggle_open()
+                self.on_status("debugger %s" %
+                              ("opened" if self.debugger.open else "closed"))
+                return
+            if ev.key == pg.K_F5 and ev.mod & pg.KMOD_CTRL:
+                if self.debugger.open:
+                    self.debugger.toggle_pause()
+                    self.on_status("PAUSED" if self.debugger.paused
+                                  else "RUNNING")
+                return
+            if ev.key == pg.K_F10 and ev.mod & pg.KMOD_CTRL:
+                if self.debugger.open:
+                    self.debugger.paused = True
+                    self.machine.step_instruction()
+                return
+            if ev.key == pg.K_F9 and ev.mod & pg.KMOD_CTRL:
+                if self.debugger.open:
+                    self.act_toggle_breakpoint()
+                return
+            if self.debugger.open and ev.key == pg.K_PAGEUP:
+                self.debugger.scroll_mem(-0x80)
+                return
+            if self.debugger.open and ev.key == pg.K_PAGEDOWN:
+                self.debugger.scroll_mem(0x80)
+                return
+            if self.debugger.open and ev.key == pg.K_HOME:
+                self.debugger.jump_mem_to(self.machine.cpu.pc)
                 return
             if ev.key in (pg.K_UP, pg.K_DOWN) and ev.mod & pg.KMOD_CTRL:
                 step = 0.05 if ev.key == pg.K_UP else -0.05
@@ -363,12 +428,17 @@ class App:
             for ev in pg.event.get():
                 self.handle_event(ev)
 
-            if not self.machine.powered_off:
-                self.machine.run_cycles(budget)
+            if not self.machine.powered_off and not self.debugger.paused:
+                bps = self.debugger.breakpoints if self.debugger.open else None
+                if self.machine.run_cycles(budget, bps):
+                    self.debugger.paused = True
+                    self.on_status("breakpoint hit @ %04X" %
+                                  self.machine.cpu.pc)
 
             now = time.monotonic()
             if self.machine.sound:
                 self.machine.sound.tick(now)
+            self.machine.printer.tick(now)  # even while paused/powered off
             if now - self.last_save > 30:
                 self.machine.save_ram_image()
                 self.last_save = now
@@ -376,6 +446,7 @@ class App:
             self.draw(now)
             clock.tick(FRAME_HZ)
 
+        self.machine.printer.flush()  # tear off any half-finished printout
         self.machine.save_ram_image()
         self.config.save()
         pg.quit()
@@ -393,6 +464,7 @@ class App:
             self.bubble.track(self.skin.key_at(pg.mouse.get_pos()), now)
             self.bubble.draw(screen, self.skin, now)
         self.menu.draw(screen)
+        self.debugger.draw(screen, self.machine)
 
         persistent = self.machine.serial.connection_state()
         if self.machine.powered_off:
@@ -405,8 +477,13 @@ def main():
     ap = argparse.ArgumentParser(description="TRS-80 Model 100 emulator")
     ap.add_argument("-w", "--windowed", action="store_true",
                     help="run in a window instead of fullscreen")
+    ap.add_argument("--load", metavar="FILE",
+                    help="load a .BA/.DO/.CO file into RAM at startup "
+                         "(e.g. a program just built by an IDE)")
+    ap.add_argument("--debug", action="store_true",
+                    help="open the debugger panel at startup")
     args = ap.parse_args()
-    App(args.windowed).run()
+    App(args.windowed, load=args.load, debug=args.debug).run()
 
 
 if __name__ == "__main__":

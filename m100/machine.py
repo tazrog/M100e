@@ -28,6 +28,7 @@ from .config import RAM_IMAGE
 from .cpu85 import CPU8085
 from .keyboard import Keyboard
 from .lcd import LCD
+from .printer import PDFPrinter
 from .rtc import UPD1990AC
 from .uart import SerialSystem
 
@@ -58,6 +59,7 @@ class Machine:
         self.rtc = UPD1990AC()
         self.cpu = CPU8085(self.read, self.write, self.io_in, self.io_out)
         self.serial = SerialSystem(config, self.cpu.set_line65, on_status)
+        self.printer = PDFPrinter(config["printer_dir"], self.on_status)
         self.sound = None  # beeper, attached by the UI when audio is up
 
         # 81C55 and misc latches
@@ -202,8 +204,10 @@ class Machine:
         return 0xFF
 
     # ------------------------------------------------------------- schedule
-    def run_cycles(self, budget):
-        """Run the CPU for `budget` cycles, firing timers along the way."""
+    def run_cycles(self, budget, breakpoints=None):
+        """Run the CPU for `budget` cycles, firing timers along the way.
+        Returns True if it stopped early because the PC hit one of
+        `breakpoints` (used by the debugger), False otherwise."""
         cpu = self.cpu
         target = cpu.cycles + budget
         while cpu.cycles < target:
@@ -212,18 +216,37 @@ class Machine:
                 stop = self.next_serial
             if target < stop:
                 stop = target
-            cpu.run(stop)
+            hit = cpu.run(stop, breakpoints)
             c = cpu.cycles
             if c >= self.next_rst75:
                 cpu.pulse_rst75()
                 self.next_rst75 = c + RST75_PERIOD
             if c >= self.next_serial:
-                self.serial.tick(c, time.monotonic())
+                wall = time.monotonic()
+                self.serial.tick(c, wall)
+                self.printer.tick(wall)
                 self.next_serial = c + SERIAL_SLICE
             if self.powered_off:
-                return
+                return False
+            if hit:
+                return True
         if not self._year_poked:
             self._maybe_poke_year()
+        return False
+
+    def step_instruction(self):
+        """Execute exactly one instruction (or one interrupt-ack), used by
+        the debugger's Step.  Keeps the same timer/serial bookkeeping as
+        run_cycles so single-stepping doesn't desync the clock."""
+        cpu = self.cpu
+        cpu.run(cpu.cycles + 1)
+        c = cpu.cycles
+        if c >= self.next_rst75:
+            cpu.pulse_rst75()
+            self.next_rst75 = c + RST75_PERIOD
+        if c >= self.next_serial:
+            self.serial.tick(c, time.monotonic())
+            self.next_serial = c + SERIAL_SLICE
 
     def _maybe_poke_year(self):
         """The uPD1990AC has no year register; the ROM keeps the year in
@@ -288,8 +311,4 @@ class Machine:
         return rows
 
     def _printer_byte(self, b):
-        try:
-            with open(self.config["printer_file"], "ab") as f:
-                f.write(bytes([b]))
-        except OSError:
-            pass
+        self.printer.feed(b)

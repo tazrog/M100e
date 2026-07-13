@@ -13,6 +13,7 @@ import numpy as np
 import pygame as pg
 
 from . import keyboard
+from .disasm import disasm_one
 from .machine import CPU_HZ
 
 ASSETS = pathlib.Path(__file__).resolve().parents[1] / "assets"
@@ -309,3 +310,99 @@ class StatusLine:
         panel.blit(surf, (pad, pad))
         screen.blit(panel, (8, screen.get_height() -
                             panel.get_height() - 6))
+
+
+class Debugger:
+    """CPU debugger overlay: registers, flags, a running disassembly around
+    PC, a memory dump, and breakpoints.  Owns only view/breakpoint state;
+    the App drives the machine (pause the frame budget, single-step,
+    resume) and just asks this to draw.  See m100e.py for the hotkeys
+    (Ctrl+F2/F5/F9/F10, PageUp/PageDown/Home)."""
+
+    WIDTH = 460
+    DISASM_LINES = 11
+    MEM_ROWS = 8
+
+    def __init__(self, font, mono_font):
+        self.font = font
+        self.mono = mono_font
+        self.open = False
+        self.paused = False
+        self.breakpoints = set()
+        self.mem_addr = 0x8000
+
+    def toggle_open(self):
+        self.open = not self.open
+
+    def toggle_pause(self):
+        if self.open:
+            self.paused = not self.paused
+
+    def toggle_breakpoint(self, addr):
+        addr &= 0xFFFF
+        if addr in self.breakpoints:
+            self.breakpoints.discard(addr)
+        else:
+            self.breakpoints.add(addr)
+
+    def scroll_mem(self, delta):
+        self.mem_addr = (self.mem_addr + delta) & 0xFFFF
+
+    def jump_mem_to(self, addr):
+        self.mem_addr = addr & 0xFFF0
+
+    def draw(self, screen, machine):
+        if not self.open:
+            return
+        w = self.WIDTH
+        h = screen.get_height()
+        panel = pg.Surface((w, h), pg.SRCALPHA)
+        panel.fill((16, 17, 20, 235))
+        pg.draw.line(panel, (110, 108, 96, 255), (0, 0), (0, h - 1), 1)
+
+        cpu = machine.cpu
+        y = [10]  # boxed so the nested helper can mutate it
+
+        def line(text, color=(222, 219, 206), font=None):
+            fnt = font or self.mono
+            panel.blit(fnt.render(text, True, color), (12, y[0]))
+            y[0] += fnt.get_height() + 2
+
+        state = "PAUSED" if self.paused else "RUNNING"
+        scol = (235, 150, 90) if self.paused else (140, 210, 150)
+        line("DEBUGGER - %s" % state, scol, self.font)
+        y[0] += 4
+        line("A=%02X  B=%02X  C=%02X  D=%02X" % (cpu.a, cpu.b, cpu.c, cpu.d))
+        line("E=%02X  H=%02X  L=%02X" % (cpu.e, cpu.h, cpu.l))
+        line("SP=%04X  PC=%04X" % (cpu.sp, cpu.pc))
+        line("flags  S=%d Z=%d AC=%d P=%d C=%d  IE=%d" %
+             (cpu.fs, cpu.fz, cpu.fa, cpu.fp, cpu.fc, cpu.ie))
+        line("cycles=%d" % cpu.cycles)
+        y[0] += 8
+
+        line("DISASSEMBLY", (170, 195, 225), self.font)
+        addr = cpu.pc
+        for _ in range(self.DISASM_LINES):
+            length, text = disasm_one(machine.read, addr)
+            bp = "*" if addr in self.breakpoints else " "
+            cur = ">" if addr == cpu.pc else " "
+            color = (255, 235, 190) if addr == cpu.pc else (200, 198, 190)
+            line("%s%s %04X  %s" % (cur, bp, addr, text), color)
+            addr = (addr + length) & 0xFFFF
+        y[0] += 8
+
+        line("MEMORY @ %04X" % self.mem_addr, (170, 195, 225), self.font)
+        base = self.mem_addr
+        for r in range(self.MEM_ROWS):
+            row = (base + r * 16) & 0xFFFF
+            data = [machine.read((row + i) & 0xFFFF) for i in range(16)]
+            hexs = " ".join("%02X" % b for b in data)
+            asc = "".join(chr(b) if 32 <= b < 127 else "." for b in data)
+            line("%04X  %s  %s" % (row, hexs, asc))
+        y[0] += 8
+
+        line("Ctrl+F5 run/pause    Ctrl+F10 step", (150, 148, 138))
+        line("Ctrl+F9 breakpoint    PgUp/PgDn/Home mem", (150, 148, 138))
+        line("Ctrl+F2 close debugger", (150, 148, 138))
+
+        screen.blit(panel, (screen.get_width() - w, 0))

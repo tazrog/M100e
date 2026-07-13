@@ -12,7 +12,8 @@ from m100 import rom
 CHAR_KEYS = {
     " ": "SPACE", "\r": "ENTER", "+": ("SHIFT", "="), "*": ("SHIFT", ":"),
     "(": ("SHIFT", "9"), ")": ("SHIFT", "0"), "\"": ("SHIFT", "'"),
-    "?": ("SHIFT", "/"), ":": ";", "$": ("SHIFT", "4"), "%": ("SHIFT", "5"),
+    "?": ("SHIFT", "/"), ":": ("SHIFT", ";"), "$": ("SHIFT", "4"),
+    "%": ("SHIFT", "5"),
 }
 
 

@@ -382,10 +382,15 @@ class CPU8085:
         self.cycles += 12
 
     # -- main loop ----------------------------------------------------------
-    def run(self, target_cycles):
-        """Execute until self.cycles >= target_cycles."""
+    def run(self, target_cycles, breakpoints=None):
+        """Execute until self.cycles >= target_cycles, or (if breakpoints is
+        given) until the PC lands on one of those addresses - checked before
+        every instruction after the first, so resuming from a breakpoint
+        doesn't immediately retrigger it.  Returns True if it stopped on a
+        breakpoint, False if it ran out the clock (or halted)."""
         ops = OPS
         rd = self.rd
+        first = True
         while self.cycles < target_cycles:
             if self.irq:
                 if self.ie:
@@ -394,7 +399,11 @@ class CPU8085:
                     self.halted = False
             if self.halted:
                 self.cycles = target_cycles
-                return
+                return False
+            if breakpoints and not first and self.pc in breakpoints:
+                return True
+            first = False
             op = rd(self.pc)
             self.pc = (self.pc + 1) & 0xFFFF
             self.cycles += ops[op](self)
+        return False
