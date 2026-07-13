@@ -313,15 +313,17 @@ class StatusLine:
 
 
 class Debugger:
-    """CPU debugger overlay: registers, flags, a running disassembly around
-    PC, a memory dump, and breakpoints.  Owns only view/breakpoint state;
-    the App drives the machine (pause the frame budget, single-step,
-    resume) and just asks this to draw.  See m100e.py for the hotkeys
-    (Ctrl+F2/F5/F9/F10, PageUp/PageDown/Home)."""
+    """CPU debugger overlay: registers/flags and a memory dump each get
+    their own tab, with a running disassembly around PC always visible
+    below, plus breakpoints.  Owns only view/breakpoint state; the App
+    drives the machine (pause the frame budget, single-step, resume) and
+    just asks this to draw.  See m100e.py for the hotkeys (Ctrl+F2/F5/F9/
+    F10, Tab, PageUp/PageDown/Home)."""
 
     WIDTH = 460
     DISASM_LINES = 11
     MEM_ROWS = 8
+    TABS = (("regs", "Registers"), ("mem", "Memory"))
 
     def __init__(self, font, mono_font):
         self.font = font
@@ -330,6 +332,8 @@ class Debugger:
         self.paused = False
         self.breakpoints = set()
         self.mem_addr = 0x8000
+        self.tab = "regs"
+        self.tab_rects = {}  # key -> screen-space Rect, filled in by draw()
 
     def toggle_open(self):
         self.open = not self.open
@@ -351,6 +355,19 @@ class Debugger:
     def jump_mem_to(self, addr):
         self.mem_addr = addr & 0xFFF0
 
+    def next_tab(self):
+        keys = [k for k, _ in self.TABS]
+        self.tab = keys[(keys.index(self.tab) + 1) % len(keys)]
+
+    def click(self, pos):
+        """Handle a left click at screen-space pos.  Returns True if it hit
+        a tab (and was consumed), False otherwise."""
+        for key, rect in self.tab_rects.items():
+            if rect.collidepoint(pos):
+                self.tab = key
+                return True
+        return False
+
     def draw(self, screen, machine):
         if not self.open:
             return
@@ -371,13 +388,44 @@ class Debugger:
         state = "PAUSED" if self.paused else "RUNNING"
         scol = (235, 150, 90) if self.paused else (140, 210, 150)
         line("DEBUGGER - %s" % state, scol, self.font)
-        y[0] += 4
-        line("A=%02X  B=%02X  C=%02X  D=%02X" % (cpu.a, cpu.b, cpu.c, cpu.d))
-        line("E=%02X  H=%02X  L=%02X" % (cpu.e, cpu.h, cpu.l))
-        line("SP=%04X  PC=%04X" % (cpu.sp, cpu.pc))
-        line("flags  S=%d Z=%d AC=%d P=%d C=%d  IE=%d" %
-             (cpu.fs, cpu.fz, cpu.fa, cpu.fp, cpu.fc, cpu.ie))
-        line("cycles=%d" % cpu.cycles)
+        y[0] += 6
+
+        # tab bar - clickable, and cycled with Tab
+        tx = 12
+        th = self.font.get_height() + 10
+        self.tab_rects = {}
+        for key, label in self.TABS:
+            tw = self.font.size(label)[0] + 22
+            active = key == self.tab
+            rect = pg.Rect(tx, y[0], tw, th)
+            pg.draw.rect(panel, (70, 78, 96, 255) if active
+                         else (34, 35, 40, 255), rect, border_radius=6)
+            panel.blit(self.font.render(
+                label, True,
+                (240, 236, 222) if active else (170, 168, 158)),
+                (tx + 11, y[0] + 5))
+            self.tab_rects[key] = rect.move(screen.get_width() - w, 0)
+            tx += tw + 8
+        y[0] += th + 8
+
+        if self.tab == "regs":
+            line("A=%02X  B=%02X  C=%02X  D=%02X" %
+                 (cpu.a, cpu.b, cpu.c, cpu.d))
+            line("E=%02X  H=%02X  L=%02X" % (cpu.e, cpu.h, cpu.l))
+            line("SP=%04X  PC=%04X" % (cpu.sp, cpu.pc))
+            line("flags  S=%d Z=%d AC=%d P=%d C=%d  IE=%d" %
+                 (cpu.fs, cpu.fz, cpu.fa, cpu.fp, cpu.fc, cpu.ie))
+            line("cycles=%d" % cpu.cycles)
+        else:
+            line("base %04X" % self.mem_addr)
+            base = self.mem_addr
+            for r in range(self.MEM_ROWS):
+                row = (base + r * 16) & 0xFFFF
+                data = [machine.read((row + i) & 0xFFFF) for i in range(16)]
+                hexs = " ".join("%02X" % b for b in data)
+                asc = "".join(chr(b) if 32 <= b < 127 else "."
+                              for b in data)
+                line("%04X  %s  %s" % (row, hexs, asc))
         y[0] += 8
 
         line("DISASSEMBLY", (170, 195, 225), self.font)
@@ -391,17 +439,8 @@ class Debugger:
             addr = (addr + length) & 0xFFFF
         y[0] += 8
 
-        line("MEMORY @ %04X" % self.mem_addr, (170, 195, 225), self.font)
-        base = self.mem_addr
-        for r in range(self.MEM_ROWS):
-            row = (base + r * 16) & 0xFFFF
-            data = [machine.read((row + i) & 0xFFFF) for i in range(16)]
-            hexs = " ".join("%02X" % b for b in data)
-            asc = "".join(chr(b) if 32 <= b < 127 else "." for b in data)
-            line("%04X  %s  %s" % (row, hexs, asc))
-        y[0] += 8
-
-        line("Ctrl+F5 run/pause    Ctrl+F10 step", (150, 148, 138))
+        line("Ctrl+Tab/click switch view   Ctrl+F5 run/pause  Ctrl+F10 step",
+             (150, 148, 138))
         line("Ctrl+F9 breakpoint    PgUp/PgDn/Home mem", (150, 148, 138))
         line("Ctrl+F2 close debugger", (150, 148, 138))
 

@@ -64,7 +64,10 @@ class App:
         self.skin.fit(self.screen.get_size())
         self.status = StatusLine(self.small_font)
 
-        rom_data = rom.get_system_rom(self.config, progress=print)
+        try:
+            rom_data = rom.get_system_rom(self.config)
+        except rom.RomError:
+            rom_data = self._first_run_rom_dialog()
         self.machine = Machine(rom_data, self.config,
                                on_status=self.on_status)
         if self.machine.load_ram_image():
@@ -104,6 +107,40 @@ class App:
     def on_status(self, msg):
         print("[m100e]", msg)
         self.status.set(msg)
+
+    # ----------------------------------------------------------- first run
+    def _first_run_rom_dialog(self):
+        """No system ROM installed: ask the user for their own dump.
+        M100e never downloads ROMs."""
+        from tkinter import messagebox
+        while True:
+            path = self.ask_open(
+                "Select your Model 100 system ROM (32K image)",
+                [("ROM images", "*.bin *.rom *.m12"), ("All files", "*")])
+            if not path:
+                print(
+                    "\nM100e needs a TRS-80 Model 100 system ROM to run,\n"
+                    "and does not download or include one.  Provide your\n"
+                    "own 32K dump (e.g. from your machine, or from the\n"
+                    "community archives) and either:\n"
+                    "  - run m100e.py again and pick it in the dialog, or\n"
+                    "  - copy it to ~/.m100e/m100rom.bin\n")
+                pg.quit()
+                sys.exit(1)
+            try:
+                data = rom.install_system_rom(path)
+            except (OSError, rom.RomError) as e:
+                root = self._tk_root()
+                try:
+                    messagebox.showerror("Not a Model 100 ROM", str(e),
+                                         parent=root)
+                finally:
+                    root.destroy()
+                continue
+            if not rom.looks_like_m100_rom(data):
+                print("[m100e] warning: image doesn't look like the "
+                      "standard Tandy ROM; running it anyway")
+            return data
 
     # ------------------------------------------------------------ dialogs
     def _tk_root(self):
@@ -380,6 +417,10 @@ class App:
                 if self.debugger.open:
                     self.act_toggle_breakpoint()
                 return
+            if ev.key == pg.K_TAB and ev.mod & pg.KMOD_CTRL:
+                if self.debugger.open:
+                    self.debugger.next_tab()
+                return
             if self.debugger.open and ev.key == pg.K_PAGEUP:
                 self.debugger.scroll_mem(-0x80)
                 return
@@ -407,6 +448,8 @@ class App:
             if ev.button == 3:
                 self.open_menu()
             elif ev.button == 1:
+                if self.debugger.open and self.debugger.click(ev.pos):
+                    return
                 name = self.skin.key_at(ev.pos)
                 if name:
                     if self.machine.powered_off:

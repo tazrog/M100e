@@ -49,30 +49,35 @@ toolbar does this with an "M100e" / "Debug" button pair; point it at this
 checkout with the `M100E_PATH` environment variable if it isn't installed
 at `~/M100e/m100e.py`).
 
-On first run the emulator fetches the Model 100 system ROM (see **ROMs**
-below), then cold-boots to the familiar menu: BASIC, TEXT, TELCOM,
-ADDRSS, SCHEDL — all the real ROM software, running on an emulated
-2.4576 MHz 80C85.
+On first run the emulator asks you for your Model 100 system ROM (see
+**ROMs** below — you must supply your own), then cold-boots to the
+familiar menu: BASIC, TEXT, TELCOM, ADDRSS, SCHEDL — all the real ROM
+software, running on an emulated 2.4576 MHz 80C85.
 
 ## ROMs
 
-**This repository contains no ROM images.**  The Model 100's 32K system
-ROM is Tandy/Microsoft code; it is preserved by the Model 100 community
-but is not ours to redistribute, so the emulator obtains it at runtime
-and keeps every ROM outside the repo (in `~/.m100e/`, which is also
-git-ignored here along with `*.bin`/`*.rom`/`*.m12` files).
-
-**System ROM (automatic).**  On first launch the emulator downloads the
-community-preserved US Model 100 ROM from the Internet Archive's
+**This emulator ships no ROM images and never downloads any.**  The
+Model 100's 32K system ROM is Tandy/Microsoft code that isn't ours to
+distribute — **you must provide your own dump**, for example one you
+read from your own machine.  The Model 100 community also preserves ROM
+images (the Internet Archive's
 [TRS-80 Model 100 software item](https://archive.org/details/trs-80-model-100),
-verifies its SHA-256 checksum, and caches it at `~/.m100e/m100rom.bin`.
-No setup needed — if the download can't complete, you'll be asked to
-supply a ROM file yourself.
+Club 100, Bitchin100); whether you may use those is between you and your
+jurisdiction.  All ROMs live outside the repo in `~/.m100e/`, and
+`*.bin`/`*.rom`/`*.m12` files are git-ignored as a guard.
 
-**System ROM (your own).**  Have a 32K dump of your own machine?
-Right-click → **Load system ROM...** and pick the file (any 32,768-byte
-image; `.bin`, `.rom`, `.m12`).  The choice is remembered in
-`~/.m100e/config.json`.
+**Installing your system ROM.**  Any one of these works:
+
+1. Just run `python3 m100e.py` — on first launch a file dialog asks for
+   your ROM image and installs it to `~/.m100e/m100rom.bin`.
+2. Copy the image there yourself: `cp my-m100-dump.bin ~/.m100e/m100rom.bin`
+3. Right-click → **Load system ROM...** at any time to switch to a
+   different 32,768-byte image (`.bin`, `.rom`, `.m12`); the choice is
+   remembered in `~/.m100e/config.json`.
+
+The image must be exactly 32K.  If it doesn't look like the standard
+Tandy ROM you get a warning but it still runs (custom and patched main
+ROMs are fine).
 
 **Option ROMs.**  The Model 100 has a socket under the machine for one
 32K option ROM.  Right-click → **Load option ROM...**, pick the image,
@@ -107,8 +112,8 @@ more (TS-DOS is the classic).  Files ending `.bin`, `.rom`, `.BX` or
   appear on the menu instantly.  **Export** goes the other way (.BA files
   are detokenized to readable source).
 - **Option ROM** — load a 32K option ROM image into the socket (TS-DOS,
-  Super ROM, …).  The archive.org item the system ROM comes from also
-  contains several option ROM carts.  Eject it from the same menu.
+  Super ROM, …).  The archive.org item linked in **ROMs** contains
+  several period option ROM carts.  Eject it from the same menu.
 - **Load system ROM** — run a custom 32K main ROM.
 - **Memory** — 8K / 16K / 24K / 32K, populated from the top down like real
   RAM modules (changing it cold-starts the machine).
@@ -132,12 +137,14 @@ more (TS-DOS is the classic).  Files ending `.bin`, `.rom`, `.BX` or
 ## Debugging
 
 **Ctrl+F2** opens a debugger overlay along the right edge of the screen —
-registers, flags, a live disassembly around PC, and a memory dump — without
-otherwise touching the machine (the Model 100 keeps running behind it).
+registers/flags and a memory dump each on their own tab, plus a live
+disassembly around PC that's always visible below — without otherwise
+touching the machine (the Model 100 keeps running behind it).
 
 | Key | Action |
 |---|---|
 | Ctrl+F2 | Open / close the debugger |
+| Ctrl+Tab (or click a tab) | Switch between the Registers and Memory tabs |
 | Ctrl+F5 | Run ⇄ Pause |
 | Ctrl+F10 | Step one instruction (auto-pauses) |
 | Ctrl+F9 | Toggle a breakpoint (prompts for a hex address; blank = current PC) |

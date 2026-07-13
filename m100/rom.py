@@ -1,67 +1,36 @@
-"""System ROM acquisition and option ROM loading.
+"""System ROM location and option ROM loading.
 
-The Model 100 needs its 32K Tandy/Microsoft system ROM to boot.  The ROM is
-preserved by the Model 100 community; on first run we fetch it from the
-Internet Archive's Model 100 software item and cache it locally.  The user
-can replace it with their own image at any time.
+M100e neither ships nor downloads ROM images.  You must provide your own
+32K Model 100 system ROM dump.  The emulator finds it in one of three
+ways, in this order:
+
+  1. the "system_rom" path in ~/.m100e/config.json (set via the menu's
+     "Load system ROM..." or the first-run file dialog),
+  2. a file placed at ~/.m100e/m100rom.bin,
+  3. a file dialog on startup when neither of the above exists - the
+     chosen image is installed to ~/.m100e/m100rom.bin for next time.
 """
 
-import hashlib
-import io
-import urllib.request
-import zipfile
+import shutil
 
 from .config import ROM_CACHE, STATE_DIR
 
 ROM_SIZE = 32768
-ROM_SHA256 = "0accd7e877ad6aad6ced81424f69e876093041f633e4900ea9d5b855830d0236"
-
-# The archive.org item holds the MAME ROM set; the system ROM lives inside a
-# nested zip as m100rom.m12.
-ARCHIVE_URL = "https://archive.org/download/trs-80-model-100/TRS80Model100.zip"
-INNER_ZIP = "roms/trsm100.zip"
-INNER_ROM = "m100rom.m12"
 
 
 class RomError(Exception):
     pass
 
 
-def _looks_like_m100_rom(data):
+def looks_like_m100_rom(data):
+    """Heuristic for the standard Tandy image (a custom or non-US ROM can
+    legitimately fail this - it's used for warnings, not rejection)."""
     return len(data) == ROM_SIZE and b"(C)Microsoft" in data
 
 
-def load_cached_rom():
-    """Return the cached ROM bytes, or None if not cached/invalid."""
-    if ROM_CACHE.exists():
-        data = ROM_CACHE.read_bytes()
-        if _looks_like_m100_rom(data):
-            return data
-    return None
-
-
-def download_rom(progress=None):
-    """Download, verify and cache the system ROM.  Returns ROM bytes."""
-    if progress:
-        progress("Downloading Model 100 ROM from archive.org...")
-    req = urllib.request.Request(ARCHIVE_URL, headers={"User-Agent": "M100e"})
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        outer = resp.read()
-    with zipfile.ZipFile(io.BytesIO(outer)) as zf:
-        inner = zf.read(INNER_ZIP)
-    with zipfile.ZipFile(io.BytesIO(inner)) as zf:
-        data = zf.read(INNER_ROM)
-    if hashlib.sha256(data).hexdigest() != ROM_SHA256:
-        raise RomError("downloaded ROM failed checksum verification")
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    ROM_CACHE.write_bytes(data)
-    if progress:
-        progress("ROM cached at %s" % ROM_CACHE)
-    return data
-
-
 def get_system_rom(config, progress=None):
-    """Resolve the system ROM: user-configured file, cache, or download."""
+    """Resolve the user-provided system ROM.  Raises RomError when no ROM
+    has been installed yet."""
     user_path = config["system_rom"]
     if user_path:
         try:
@@ -69,12 +38,30 @@ def get_system_rom(config, progress=None):
             if len(data) == ROM_SIZE:
                 return data
         except OSError:
-            pass
-        # fall through to the standard ROM if the user file vanished
-    data = load_cached_rom()
-    if data is not None:
-        return data
-    return download_rom(progress)
+            pass  # configured file vanished; fall through to the cache
+    if ROM_CACHE.exists():
+        data = ROM_CACHE.read_bytes()
+        if len(data) == ROM_SIZE:
+            return data
+    raise RomError(
+        "No system ROM installed.  Provide your own 32K Model 100 ROM "
+        "dump: copy it to %s, or start the emulator and pick it in the "
+        "file dialog." % ROM_CACHE)
+
+
+def install_system_rom(path):
+    """Validate a user-chosen ROM file and install it as the default.
+    Returns the ROM bytes."""
+    data = open(path, "rb").read()
+    if len(data) != ROM_SIZE:
+        raise RomError("%s is %d bytes; a Model 100 system ROM is exactly "
+                       "32768 bytes" % (path, len(data)))
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copyfile(path, ROM_CACHE)
+    except OSError:
+        pass  # not fatal: we can still run from the original location
+    return data
 
 
 def load_rom_file(path):
