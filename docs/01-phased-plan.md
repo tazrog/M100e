@@ -1,0 +1,193 @@
+# 01 — Phased plan
+
+Target end state (confirmed): a working machine inside the original M100 case,
+self-powered, closes up.
+
+Ordering rule applied throughout: **each phase introduces exactly one class of
+unknown.** Where a phase would introduce two, it is split. The panel is brought
+up before the CPU exists, and the CPU is brought up before it is allowed near the
+panel, so that when they meet in Phase 5 both halves are already known good.
+
+Phase 1 is deliberately *not* the CPU. The riskiest assumption in this project is
+not "can I write an 8085" — you have already written one in Python and it runs
+the ROM. It is **"can 3.3V FPGA logic, my own level shifting, and my own negative
+bias supply drive a 40-year-old panel I cannot replace, without destroying it."**
+That is what Phase 1 attacks, with zero CPU in the picture.
+
+---
+
+## Phase 0 — Gather, dump, instrument
+
+**Work**
+- Collect every document in `05-sources.md`. Read the HD44102 datasheet
+  end to end; extract E pulse width, setup/hold, and the CS1/CS2/CS3 selection
+  truth table into a one-page cheat sheet you keep at the bench.
+- Dump the system ROM from the donor board. Do not download it.
+- Instrument the Python emulator to emit a **bus trace oracle**: for every LCD
+  access, log `(cs_mask, c/d, r/w, data)`; for every CPU instruction in the first
+  few million cycles, log `(pc, a, bc, de, hl, sp, flags)`. Both become the
+  golden references for Phases 3 and 4.
+- Run the Task 0 step-4 popcount check. Confirm multi-bit CS masks.
+- Photograph the donor board, both sides, high resolution, before any cutting.
+- Buzz out and record: LCD connector pin-to-81C55 map, keyboard connector
+  pin-to-matrix map, and the polarity of the keyboard column drive (the
+  emulator says active low — confirm there is or is not an inverting buffer).
+
+**Go / no-go:** you have a ROM image that boots your own emulator, a trace file
+you can diff against, and a verified wiring map from both connectors. If the ROM
+dump fails, stop and solve that — everything downstream needs it.
+
+---
+
+## Phase 1 — Panel alive, no CPU
+
+The riskiest assumption, attacked with the least machinery.
+
+**Work**
+- Build the −5V VEE supply on protoboard: ICL7660/TC1044S charge pump, plus a
+  contrast pot. Bring it up **disconnected from the panel**, verify −5V and the
+  contrast range with a DMM, and load it with a resistor to confirm it holds.
+- Build the level-shift layer: 74HCT245 outbound (3.3V logic in, 5V out) for data
+  and control, 74LVC245A inbound at 3.3V for reads, 2× 74HCT595 for the CS chain.
+  Series resistors (33–100 Ω) on every line that touches the panel.
+- Write a small FPGA state machine — no CPU, no ROM — that resets the panel, then
+  walks a checkerboard / diagonal / all-on / all-off pattern into all ten
+  drivers, then reads the display RAM back.
+- Power sequencing: bring VDD up before VEE, and confirm the panel's behaviour at
+  power-off ordering too.
+
+**Go / no-go:**
+1. Stable, correct pattern on all 240×64, all ten drivers, no dropouts.
+2. Contrast sweeps smoothly across the pot range without ghosting or streaking.
+3. **Readback matches what was written** — this proves the bidirectional path,
+   the inbound translator, and R/W handling in one test.
+4. Nothing above ambient temperature after 30 minutes.
+
+**If it fails, the fault is electrical — bias, translation, or E timing.** There
+is no CPU, no ROM and no CS decode logic in the picture to blame. Missing or
+faint columns that move when you flex the panel are the classic zebra-strip
+contact fault, not your logic.
+
+---
+
+## Phase 2 — Keyboard alive, no CPU
+
+**Work**
+- Drive the nine columns and read eight rows directly from FPGA pins at 3.3V.
+- Scan active-low, one column asserted at a time, others driven high or
+  tri-stated — never two columns low, or you fight the rollover diodes.
+- Report results over the onboard USB-serial debugger, or as a simple key-name
+  overlay on the HDMI output you already have working.
+
+**Go / no-go:** every key on the physical keyboard, including SHIFT, CTRL, GRPH,
+CODE, NUM, CAPS and PAUSE/BREAK, produces exactly the matrix position listed in
+`m100/keyboard.py`'s `MATRIX` table, with no phantoms when three keys in an L are
+held. That table is your expected-value oracle — it already encodes the answer.
+
+---
+
+## Phase 3 — CPU core + ROM + RAM, no peripherals
+
+**Work**
+- 8085 core in fabric (see `06-decisions.md` for build-vs-reuse), 32K ROM and 32K
+  RAM in BSRAM. The GW2AR-18 has ample block RAM for both.
+- HDMI debug console showing PC, registers, and a scrolling instruction window.
+- Lockstep trace compare against the Phase 0 oracle: run N instructions, diff.
+
+**Go / no-go:** the core matches the Python emulator's PC and register trace for
+the entire boot sequence up to the first LCD port access — no divergence, not
+"close." Undocumented opcodes, RIM/SIM behaviour and the RST 5.5/6.5/7.5 masks
+are where a divergence will show up; the diff tells you the exact instruction.
+
+---
+
+## Phase 4 — 8155 + LCD bridge, on HDMI only
+
+The panel stays disconnected. This is the phase where the HDMI shadow
+framebuffer earns its keep.
+
+**Work**
+- 8155 model in fabric: port latches, timer, and the shared PA/PB semantics.
+- LCD register-level bridge: the 10-bit CS mask, ten HD44102 models in fabric
+  each with display RAM, pointer, and start-page register.
+- Bus sequencer implementing HD44102 E-strobe timing and **stalling the CPU by
+  gating READY**, not by completing the write in one clock.
+- HDMI shadow framebuffer that renders the ten fabric-modelled driver RAMs
+  through the exact same geometry as `lcd.py`'s `pixels()`, including the
+  hardware-scroll start page.
+
+**Go / no-go:** the boot menu, then BASIC, render correctly on HDMI, pixel-identical
+to the Python emulator's screen for the same ROM and keystrokes. Because this
+runs against fabric-modelled drivers, any error here is *logic* — CS decode,
+pointer wrap at column 50, page addressing, scroll. None of it can be blamed on
+wiring or bias.
+
+---
+
+## Phase 5 — Real panel, real keyboard, real machine
+
+Now, and only now, the two proven halves meet.
+
+**Work**
+- Swap the fabric HD44102 models for the real panel behind the bus sequencer.
+  Keep the HDMI shadow live *in parallel* — driven from writes as they go out to
+  the panel.
+- Bring the real keyboard in behind the Phase 2 scanner.
+- Wire the real busy flag through instead of synthesising it.
+
+**Go / no-go:** cold boot to the menu on the real panel, enter BASIC, type and run
+a program, save it to a RAM file, list it back. **HDMI and the panel must agree.**
+Where they disagree is your diagnostic: HDMI correct + panel wrong is a wiring,
+timing or bias fault; both wrong is logic. This is exactly the discrimination you
+asked for, and it is only possible because Phase 4 established HDMI as trusted.
+
+---
+
+## Phase 6 — Peripherals and persistence
+
+**Work**
+- RTC (µPD1990AC), beeper, UART/RS-232, printer strobe, option-ROM bank switch.
+- **RAM persistence.** A real M100 keeps files in battery-backed RAM; your FPGA
+  RAM is volatile, so files vanish on power-off unless you handle it. The ROM
+  already tells you when: Port B bit 4 is the power-off line, which your emulator
+  models. Intercept it, flush 32K to microSD, restore at boot.
+
+**Go / no-go:** power-cycle the machine and find your BASIC program and TEXT
+documents still there. Set the clock, confirm it survives. Beeper sounds on
+BEEP/error.
+
+---
+
+## Phase 7 — Into the case
+
+**Work**
+- Mount the Tang Nano and the interface board on the donor standoffs; route the
+  LCD flex and keyboard connector at their original lengths.
+- Power: the case must run from a wall wart and/or the AA compartment. You need a
+  regulated 5V rail for the panel logic and the Tang Nano; 4×AA at 4.8–6V needs a
+  small buck-boost module.
+- Cut-outs, if any, for USB/JTAG access and HDMI debug — decide whether HDMI stays
+  permanently accessible or becomes an internal header.
+
+**Go / no-go:** case closes, runs on its own power for an hour, boots and takes
+keystrokes with the lid shut, and nothing inside exceeds hand-warm.
+
+---
+
+## Phase dependency map
+
+```
+P0 gather/dump/instrument
+ ├─> P1 panel alive (electrical unknowns)      ─┐
+ ├─> P2 keyboard alive (matrix unknowns)       ─┤
+ └─> P3 CPU + ROM (core-correctness unknowns)  ─┤
+        └─> P4 8155 + LCD bridge on HDMI       ─┤ (logic unknowns)
+                                                └─> P5 integration
+                                                      └─> P6 peripherals
+                                                            └─> P7 case
+```
+
+P1, P2 and P3 are independent of each other and can be interleaved when you are
+blocked or bored — they share no unknowns. P4 must not begin before P3 passes,
+and P5 must not begin before P1 and P4 both pass. Resist the temptation to plug
+the panel in early: the panel is the one component you cannot replace.
