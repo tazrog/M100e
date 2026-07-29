@@ -255,8 +255,16 @@ IP-core quirks. The GW2AR-18's 828 Kb of block RAM is ample, so capacity is not
 the issue — inference style and initialisation from a ROM hex file are.
 
 **Mitigation:** you already have HDMI working on this board, so the toolchain is
-not new to you. Get the ROM image loading into BSRAM as a standalone experiment
-early in Phase 3, before the core depends on it.
+not new to you. Move both toolchain unknowns into Phase 0 as standalone
+experiments, per `07-toolchain.md`: ROM-into-BSRAM with a readback check, and a
+blinky flashed to QSPI NOR that cold-boots with no PC attached.
+
+**The flash test is the one people skip.** openFPGALoader has open reports of
+CRC/ID-verify failures and hangs writing flash on Tang Nano boards. If that bites
+you it is a Gowin-Programmer-instead annoyance discovered in Phase 0, or a
+project-blocking discovery in Phase 7 with the case half-assembled — the end
+state is a closed case with no PC attached, so SRAM-only loading is not a
+finished machine.
 
 ---
 

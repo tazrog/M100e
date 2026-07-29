@@ -33,6 +33,19 @@ rather than having read the primary myself.
 | **ICL7660S / TC1044S** | Renesas / Microchip | Charge-pump external component values and the boost-frequency pin. |
 | **Tang Nano 20K schematic + pin list** | [Sipeed wiki](https://wiki.sipeed.com/hardware/en/tang/tang-nano-20k/nano-20k.html), [sipeed_wiki on GitHub](https://github.com/sipeed/sipeed_wiki) | **Needed to close R5.** The wiki page itself does not answer whether the 40-pin RGB FPC pins are separate FPGA I/O; go to the schematic. |
 
+## Toolchain
+
+Working notes and project-specific setup are in `07-toolchain.md`; these are the
+reference documents behind it.
+
+| What | Where | Notes |
+|---|---|---|
+| **Gowin EDA user guides** — IP Core Generator, GAO analyzer, constraint (`.cst`/`.sdc`) syntax | Bundled with your install (`gowin/IDE/doc`), also on the Gowin site | Prefer the bundled copies. Web copies drift across versions, and constraint syntax and Project Settings defaults are exactly where that bites. |
+| **GW2AR-18 datasheet / GW2A family user guide** | Gowin site | BSRAM primitives, rPLL parameters, I/O standards and drive-strength options. |
+| **openFPGALoader** | [github.com/trabucayre/openFPGALoader](https://github.com/trabucayre/openFPGALoader) | Scriptable programming. Skim the issue tracker for Tang Nano flash-write reports ([#511](https://github.com/trabucayre/openFPGALoader/issues/511), [#241](https://github.com/trabucayre/openFPGALoader/issues/241)) before you rely on flash boot in Phase 7. |
+| **Sipeed: flashing on Linux** | [wiki.sipeed.com](https://wiki.sipeed.com/hardware/en/tang/Tang-Nano-Doc/flash-in-linux.html) | Board-specific programming notes. |
+| **Verilator / Icarus Verilog + GTKWave** | [verilator.org](https://www.veripool.org/verilator/), [steveicarus.github.io/iverilog](https://steveicarus.github.io/iverilog/) | Where the Phase 3 trace diff runs. Not Gowin's built-in simulator. |
+
 ## ROM image
 
 You must dump your own — and this repository's own policy is explicit about that.

@@ -35,6 +35,13 @@ That is what Phase 1 attacks, with zero CPU in the picture.
   few million cycles, log `(pc, a, bc, de, hl, sp, flags)`. Both become the
   golden references for Phases 3 and 4.
 - Run the Task 0 step-4 popcount check. Confirm multi-bit CS masks.
+- **Gowin toolchain groundwork** (details in `07-toolchain.md`): write
+  `tools/rom2mi.py`, load the ROM into BSRAM and read known bytes back out to
+  prove initialisation works; flash a blinky to the QSPI NOR and confirm the
+  board cold-boots with no PC attached; stand up the Makefile and `.gitignore`
+  additions; record the Gowin EDA version. All of this is cheap now and
+  expensive to discover later — particularly the flash test, since the end state
+  is a closed case with no PC attached.
 - Photograph the donor board, both sides, high resolution, before any cutting.
 - Buzz out and record: LCD connector pin-to-81C55 map, keyboard connector
   pin-to-matrix map, and the polarity of the keyboard column drive (the
@@ -45,8 +52,9 @@ That is what Phase 1 attacks, with zero CPU in the picture.
   later will look exactly like a chip-select bug.
 
 **Go / no-go:** you have a ROM image that boots your own emulator, a trace file
-you can diff against, and a verified wiring map from both connectors. If the ROM
-dump fails, stop and solve that — everything downstream needs it.
+you can diff against, a verified wiring map from both connectors, and a board
+that boots a trivial design from its own flash. If the ROM dump fails, stop and
+solve that — everything downstream needs it.
 
 ---
 
@@ -72,6 +80,10 @@ The riskiest assumption, attacked with the least machinery.
 - Write a small FPGA state machine — no CPU, no ROM — that resets the panel, then
   walks a checkerboard / diagonal / all-on / all-off pattern into all ten
   drivers, then reads the display RAM back.
+- First real `.cst`: panel pins at `LVCMOS33`, conservative `DRIVE`, and
+  unused/dual-purpose pins set to input tri-state so the panel is not driven
+  during FPGA configuration (R10). Bring up the NCO clock enable here too — see
+  `07-toolchain.md`.
 - Power sequencing: bring VDD up before VEE, and confirm the panel's behaviour at
   power-off ordering too.
 
@@ -93,7 +105,8 @@ as a diagnostic reading, and do not follow it by opening the stack (R4).
 ## Phase 2 — Keyboard alive, no CPU
 
 **Work**
-- Drive the nine columns and read eight rows directly from FPGA pins at 3.3V.
+- Drive the nine columns and read eight rows directly from FPGA pins at 3.3V,
+  rows constrained `PULL_MODE=UP` for the internal pull-ups.
 - Scan active-low, one column asserted at a time, others driven high or
   tri-stated — never two columns low, or you fight the rollover diodes.
 - Report results over the onboard USB-serial debugger, or as a simple key-name
@@ -110,8 +123,12 @@ held. That table is your expected-value oracle — it already encodes the answer
 
 **Work**
 - 8085 core in fabric (see `06-decisions.md` for build-vs-reuse), 32K ROM and 32K
-  RAM in BSRAM. The GW2AR-18 has ample block RAM for both.
+  RAM in BSRAM — 512 Kbit of the GW2AR-18's 828 Kbit, no SDRAM required.
 - HDMI debug console showing PC, registers, and a scrolling instruction window.
+- **Build the Verilator/Icarus trace harness before the core is finished**, not
+  after: same per-instruction dump format as the instrumented `cpu85.py`, one
+  `make` target, diff. This is the single decision that separates a 35-hour
+  Phase 3 from an 80-hour one.
 - Lockstep trace compare against the Phase 0 oracle: run N instructions, diff.
 
 **Go / no-go:** the core matches the Python emulator's PC and register trace for
@@ -135,6 +152,9 @@ framebuffer earns its keep.
 - HDMI shadow framebuffer that renders the ten fabric-modelled driver RAMs
   through the exact same geometry as `lcd.py`'s `pixels()`, including the
   hardware-scroll start page.
+- GAO instrumentation on the sequencer, and HD44102 setup/hold assertions in the
+  simulation testbench so violations fail loudly in sim rather than subtly on
+  glass. `.sdc` gets a two-FF synchroniser and `set_false_path` on the busy input.
 
 **Go / no-go:** the boot menu, then BASIC, render correctly on HDMI, pixel-identical
 to the Python emulator's screen for the same ROM and keystrokes. Because this
@@ -188,6 +208,10 @@ BEEP/error.
   small buck-boost module.
 - Cut-outs, if any, for USB/JTAG access and HDMI debug — decide whether HDMI stays
   permanently accessible or becomes an internal header.
+- **Write the bitstream to QSPI NOR flash** so the machine boots itself with no
+  PC attached. A design that only lives in SRAM is not a finished machine — and
+  this is why `07-toolchain.md` has you prove flash programming works back in
+  Phase 0.
 
 **Go / no-go:** case closes, runs on its own power for an hour, boots and takes
 keystrokes with the lid shut, and nothing inside exceeds hand-warm.
