@@ -32,16 +32,23 @@ separately because they are not needed "before it displays a character."
 | 11 | 24 AWG solid / wire-wrap wire, multi-colour | 1 | Point-to-point wiring on protoboard. | ~$6 | ~$6.00 | Amazon | |
 | 12 | Desoldering braid + manual solder sucker | 1 ea | You have no desoldering gear. This is the cheap substitute; the PCB-cutting strategy in `06-decisions.md` is what keeps it sufficient. | ~$8 | ~$8.00 | Amazon | |
 | 13 | 5V USB supply, 2 A, with a spare cable | 1 | Bench power for the Tang Nano + panel logic. Panel logic draws tens of mA, so the Nano's 5V pin can feed it — measure before you rely on it. | ~$8 | ~$8.00 | Amazon / on hand | |
+| 13a | Kapton tape (10 mm) + hot glue sticks + a scrap rigid base | 1 | **Strain relief for the LCD flex tail and mechanical fixing for the socket island.** With the panel staying mounted, the tail and socket become the fragile items (R4b). This is the cheapest line on the list protecting the most irreplaceable part. | ~$7 | ~$7.00 | Amazon / on hand | |
+| 13b | 30-way ribbon or stranded hookup, 400 mm | 1 | The harness from the socket island to the protoboard, so all bench movement happens in replaceable wire rather than in the flex. | ~$5 | ~$5.00 | Amazon / AliExpress | | |
 
-**Tier 1 subtotal: ~$64.40** — or **~$50** if you raid the donor board for
+**Tier 1 subtotal: ~$76.40** — or **~$62** if you raid the donor board for
 passives, sockets and a trimpot before ordering.
 
-**That fits your $75 with about $10 of headroom.** Spend it on **Tier 2 item 18,
-the LCD zebra strips (~$10–15)** — nothing else at that price protects as much
-project time. The classic M100 missing-columns fault is a contact fault, and
-having strips on hand turns "is this my CS decode?" into an hour's swap instead of
-a week of doubt (risk R4). If they come in over budget, harvesting the donor's
-passives covers the difference.
+**That lands a shade over your $75, and harvesting the donor's passives brings it
+comfortably back under.** Items 13a and 13b are the reason it moved: with the LCD
+staying mounted, the flex tail and its socket become the fragile items, and $12
+of tape, glue and wire is what keeps them motionless for six months.
+
+**Note the change of advice on zebra strips.** With the assembly staying sealed,
+Tier 2 item 18 drops from "buy with the first order" to "buy only if you actually
+see column dropouts." The dominant way people induce that fault is opening the
+stack, which you are not doing — so the strips would most likely sit unused in a
+drawer. Accept the 1–2 week wait if the day ever comes; spend the money on
+strain relief now instead.
 
 Do **not** economise by dropping the spare 74HCT245/74HCT595 — those are the
 parts most likely to die during bring-up, they cost pennies, and a missing $0.60
@@ -66,7 +73,7 @@ part stalls a whole evening.
 | # | Item | Qty | Why | Est. price | Supplier | Priority |
 |---|---|---|---|---|---|---|
 | 17 | **Second donor M100 or spare LCD panel** | 1 | The single highest-value insurance on this list. The HD44102 is obsolete; if you destroy a driver, the project stops dead. A parts machine with a good panel restores it. | ~$60–150 | eBay | **Highest** |
-| 18 | LCD zebra strips, M100 set | 1 set | The classic M100 "missing columns" fault is contact, not silicon. Having these on hand stops you from misdiagnosing a contact fault as a CS-decode bug for a week. | ~$10–15 | [Soigeneris](https://www.soigeneris.com/trs-80-model-100-lcd-zebra-strips) | **Highest** |
+| 18 | LCD zebra strips, M100 set | 1 set | The classic M100 "missing columns" fault is contact, not silicon. **Downgraded from Highest** now that the panel assembly stays mounted and clamped — you are not opening the stack, so you are not going to induce the fault, and fitting these would mean doing the exact operation you are avoiding. Buy reactively, not preemptively. | ~$10–15 | [Soigeneris](https://www.soigeneris.com/trs-80-model-100-lcd-zebra-strips) | Low-Medium |
 | 19 | Entry oscilloscope (FNIRSI DSO152 / DSO138 kit class) | 1 | A DMM reads the VEE rail fine, so you can start without one. You want a scope the moment you suspect charge-pump ripple, E-strobe edge quality, or contention on the data bus — none of which a logic analyzer shows you. | ~$25–60 | Amazon / AliExpress | High |
 | 20 | Custom PCB, 2-layer, ~80×60 mm | 5 | Replaces the protoboard once the design is stable. See `06-decisions.md`. | ~$10–30 inc. shipping | JLCPCB / PCBWay | Medium |
 | 21 | Hot-air rework station (858D class) | 1 | Makes connector harvesting realistic instead of destructive. Not required if you take the cut-the-PCB route. | ~$45–60 | Amazon / AliExpress | Medium |
@@ -83,10 +90,9 @@ part stalls a whole evening.
 
 | Tier | Subtotal |
 |---|---|
-| Tier 1, bare minimum, to first character | **~$64** (~$50 harvesting donor passives) |
-| Tier 1 + zebra strips (recommended, uses the headroom) | **~$77** |
-| Tier 1 + 1b, complete machine in the case | **~$86** |
-| Tier 1 + 1b + Tier 2, comfortable | **~$280–460** |
+| Tier 1, bare minimum, to first character | **~$76** (~$62 harvesting donor passives) |
+| Tier 1 + 1b, complete machine in the case | **~$98** (~$84 harvested) |
+| Tier 1 + 1b + Tier 2, comfortable | **~$290–470** |
 
 ---
 
@@ -95,7 +101,7 @@ part stalls a whole evening.
 | Item | Problem | What to do |
 |---|---|---|
 | **HD44102 / HD44103** | Obsolete, no second source, only eBay/AliExpress pulls of dubious provenance at $10–30 each. Replacing one on the panel means rework on a flex-mounted, possibly COB assembly. | Treat as unobtainable. Protect the panel with series resistors, correct power sequencing, and never hot-plugging. This constraint drives the whole phase order in `01-phased-plan.md`. |
-| **M100 LCD zebra strips** | Niche; one or two hobby suppliers. | Buy with the first order, not when you need them. |
+| **M100 LCD zebra strips** | Niche; one or two hobby suppliers, so expect a 1–2 week wait. | Buy reactively — the mounted-panel decision makes it unlikely you will need them, and fitting them means opening the stack you are protecting. |
 | **HU-30P-2G-L13 30-pin connector** | Long obsolete; pitch unconfirmed by me. | Prefer cutting the donor's connector island out of the PCB. If you must buy, measure the flex pitch first. |
 | **74LVC245A in DIP** | DIP stock is thinning across vendors. | SOIC + adapter, or resistor dividers. Not a project risk, just an annoyance. |
 | **System ROM image** | You must dump your own. | Phase 0. Read it off the donor's mask ROM. |

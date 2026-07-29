@@ -76,18 +76,68 @@ partially, measure its V2 line at both pot extremes.
 
 ## R4 — Zebra-strip contact faults masquerade as CS-decode bugs
 
-**Likelihood:** high · **Pain:** days · **Rank: 4**
+**Likelihood:** medium (downgraded from high — see below) · **Pain:** days ·
+**Rank: 4**
 
 This is the single most common M100 display fault: dead or dim columns caused by
-the elastomeric connector between panel and PCB losing contact after 40 years.
-The symptom — a rectangular region of the screen wrong or missing — is *exactly*
-what a broken chip select looks like.
+the elastomeric connector between glass and driver PCB losing contact after 40
+years. The symptom — a rectangular region of the screen wrong or missing — is
+*exactly* what a broken chip select looks like.
 
-**Mitigation:** the HDMI shadow framebuffer, which is why it is built in Phase 4
-before the panel is ever connected. HDMI correct + panel region missing = contact
-or wiring. Both wrong = logic. Secondary: the missing region moving or changing
-when you press on the panel bezel is diagnostic on its own. Keep a spare set of
-zebra strips on hand so you can rule it out in an hour instead of a week.
+**Downgraded because the panel assembly stays mounted and clamped for the
+duration of the project.** The dominant way hobbyists induce this fault is by
+unscrewing the frame, relieving the clamping pressure on the strips, and
+reassembling slightly differently. If the stack is never opened, that mechanism
+is off the table and you are left only with latent age-related contact
+degradation on an assembly that is currently confirmed working.
+
+**Mitigation:** the HDMI shadow framebuffer, built in Phase 4 before the panel is
+ever connected. HDMI correct + panel region missing = contact or wiring. Both
+wrong = logic. Secondary: a missing region that changes when you press the bezel
+is diagnostic on its own — and note that pressing the bezel is a *test*, not a
+repair; do not follow it by opening the stack unless you have decided the strips
+really are the fault.
+
+**Standing rule for this project: the LCD frame screws do not come out.** If you
+reach a point where you believe the strips must be reseated, treat that as a
+deliberate, separately planned operation with the replacement strips already in
+hand — not as a debugging step taken at 11pm.
+
+---
+
+## R4b — The flex tail and its socket become the new weak point
+
+**Likelihood:** medium-high · **Pain:** hours to project-ending · **Rank: 4b**
+
+Keeping the panel mounted moves the mechanical risk rather than removing it.
+With the glass/PCB/zebra stack sealed, the fragile things become the 30-pin flex
+tail coming off the module and the socket it mates into — a 40-year-old friction
+FFC socket whose contacts were never designed for repeated cycling. During
+Phases 1 and 5 the panel will be sitting on the bench next to your protoboard,
+tethered by exactly that flex. Every time you drag the board across the bench,
+you are working the tail. A cracked flex conductor is as project-ending as a dead
+HD44102, and it presents as — again — a missing region that looks like a CS fault.
+
+**Mitigation**
+- **Mate the flex into the socket island once, then never again.** All
+  bench-side reconfiguration happens on the far side of the wire harness, not at
+  the flex. This also removes the hot-plug kill mechanism in R1: your disconnect
+  point becomes the harness, which is cheap and replaceable.
+- **Fix the socket island down.** Cut it with enough surrounding PCB to take two
+  screws or a generous blob of hot glue onto a scrap of plywood or acrylic, and
+  mount the case top half to the same base. The flex then never moves relative to
+  its socket.
+- **Put all flexing in the wire harness.** Run 300–400 mm of ribbon or stranded
+  wire from the island's pads to the protoboard, so bench movement is absorbed by
+  wire you can replace in an evening.
+- **Strain-relieve the tail** with Kapton tape where it leaves the module, before
+  you start, not after you notice a problem.
+- Photograph and buzz out the flex before mating it, per Phase 0 — once it is in
+  and glued down you are not pulling it back out to check a pinout.
+
+**Fallback if the flex is already damaged or a conductor is open:** you are back
+to opening the stack or building a harness direct to the module, both worse than
+anything above. That is why R4b sits this high despite being cheap to mitigate.
 
 ---
 

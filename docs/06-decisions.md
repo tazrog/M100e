@@ -70,6 +70,11 @@ and the board is your only physical reference (R9).
 This is the most consequential decision of the three, and your no-hot-air, sub-$75
 situation pushes it in a specific direction.
 
+**Standing constraint that shapes all three options: the LCD assembly stays
+mounted and clamped.** The glass, driver PCB and zebra strips are never
+separated, the frame screws never come out, and the module's flex tail stays
+mated in an original socket. Everything below is evaluated against that.
+
 ### Option A — Passive carrier: depopulate the donor board, keep it as the chassis
 
 Desolder or cut away the active silicon, keep the PCB with its connectors, power
@@ -115,16 +120,32 @@ fully intentional. You can cut generously enough to keep the first few
 centimetres of the original traces, which gives you comfortable places to land
 wires.
 
+**And, decisively, it is the only option that lets the panel assembly stay
+sealed.** The module's flex tail mates into its original socket, on its original
+pads, at its original insertion depth — once — and then never moves again. You
+solder to the island's copper, not to the flex. No heat near the tail, no
+reseating, no clamping pressure disturbed. Cut the island large enough to take
+two mounting screws, fix it and the case top half to a common base, and run a
+300–400 mm wire harness from the island to the protoboard so that all bench
+movement is absorbed by wire you can replace in an evening (see R4b).
+
 **Against:** Irreversible, and it consumes the reference board. Requires the
 Phase 0 photography and buzz-out discipline to be done properly *first*. The
 islands need their own mechanical mounting solution in Phase 7.
 
-**Recommendation: Option C.** It captures most of Option A's connector benefit at
-none of its desoldering cost or inherited-fault confusion, and it is the only one
-of the three that is comfortable with the tools you actually own. Option A is
-defensible if you find you enjoy the depopulation work and the board turns out to
-be cleaner than expected — but do not commit to it before you have removed one
-40-pin DIP with braid and a sucker and seen how that evening goes.
+**Recommendation: Option C, and the panel-stays-mounted constraint settles it.**
+It captures most of Option A's connector benefit at none of its desoldering cost
+or inherited-fault confusion, it is the only one of the three comfortable with the
+tools you actually own, and it is the only one that never asks you to touch the
+flex tail or the zebra stack.
+
+Option B is now clearly the worst of the three, not merely the most laborious:
+harvesting the socket loose with braid and a sucker means heat and mechanical
+stress right where the flex has to mate, and if the socket is damaged in the
+process your sealed panel has nowhere to plug in. Option A remains defensible if
+depopulation turns out to be pleasant work — but do not commit to it before you
+have removed one 40-pin DIP with braid and a sucker and seen how that evening
+goes.
 
 **Precondition on any of these, non-negotiable:** Phase 0's photographs and
 connector buzz-out are complete and written down before the tool touches the

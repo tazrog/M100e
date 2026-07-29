@@ -3,6 +3,13 @@
 Target end state (confirmed): a working machine inside the original M100 case,
 self-powered, closes up.
 
+**Standing mechanical constraint: the LCD assembly is never opened.** Glass,
+driver PCB and zebra strips stay clamped as a unit for the life of the project;
+the frame screws stay in; the flex tail mates into its socket once and then stays
+put. Every phase below assumes it. The corollary is that the tail and socket
+become the fragile items instead — see R4b — so Phase 1 includes building a rig
+that keeps them motionless.
+
 Ordering rule applied throughout: **each phase introduces exactly one class of
 unknown.** Where a phase would introduce two, it is split. The panel is brought
 up before the CPU exists, and the CPU is brought up before it is allowed near the
@@ -32,6 +39,10 @@ That is what Phase 1 attacks, with zero CPU in the picture.
 - Buzz out and record: LCD connector pin-to-81C55 map, keyboard connector
   pin-to-matrix map, and the polarity of the keyboard column drive (the
   emulator says active low — confirm there is or is not an inverting buffer).
+- **Buzz the flex tail's 30 conductors end to end while it is still unmated**,
+  and record the result. Once it is seated in the glued-down island in Phase 1
+  you are not pulling it back out to check a pinout, and an open conductor found
+  later will look exactly like a chip-select bug.
 
 **Go / no-go:** you have a ROM image that boots your own emulator, a trace file
 you can diff against, and a verified wiring map from both connectors. If the ROM
@@ -44,6 +55,14 @@ dump fails, stop and solve that — everything downstream needs it.
 The riskiest assumption, attacked with the least machinery.
 
 **Work**
+- **Build the bench rig first, before any electronics.** Cut the LCD socket
+  island out of the donor board (per `06-decisions.md` D3), screw or glue it to a
+  rigid base — plywood, acrylic, whatever — and fix the case top half carrying
+  the mounted panel to that same base. Mate the flex tail into the socket **once**.
+  Kapton-tape the tail where it leaves the module. Run a 300–400 mm wire harness
+  from the island's pads out to where the protoboard will live, and put a
+  connector on the *protoboard* end. From here on, everything you plug, unplug,
+  rewire or accidentally yank happens on that far end. The flex never moves again.
 - Build the −5V VEE supply on protoboard: ICL7660/TC1044S charge pump, plus a
   contrast pot. Bring it up **disconnected from the panel**, verify −5V and the
   contrast range with a DMM, and load it with a resistor to confirm it holds.
@@ -65,8 +84,9 @@ The riskiest assumption, attacked with the least machinery.
 
 **If it fails, the fault is electrical — bias, translation, or E timing.** There
 is no CPU, no ROM and no CS decode logic in the picture to blame. Missing or
-faint columns that move when you flex the panel are the classic zebra-strip
-contact fault, not your logic.
+faint columns that change under *light* thumb pressure on the bezel are the
+classic zebra-strip contact fault, not your logic — press gently, treat it purely
+as a diagnostic reading, and do not follow it by opening the stack (R4).
 
 ---
 
