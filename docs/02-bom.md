@@ -6,9 +6,9 @@ could get a real figure through search (marked ✓) and are otherwise my best
 estimate from recent distributor pricing (marked ~). Treat every ~ figure as
 ±30% and verify at order time. I would rather you check than get burned.
 
-**Assumed already owned:** Tang Nano 20K, soldering iron, logic analyzer, PC with
-Gowin toolchain, LCD panel, keyboard, case, standoffs, flex cables, donor board
-passives.
+**Assumed already owned:** Tang Nano 20K, soldering iron, logic analyzer,
+**multimeter**, PC with Gowin toolchain, LCD panel, keyboard, case, standoffs,
+flex cables, donor board passives.
 
 ---
 
@@ -19,7 +19,7 @@ separately because they are not needed "before it displays a character."
 
 | # | Item | Qty | Why needed | Est. unit | Est. total | Supplier | Flags |
 |---|---|---|---|---|---|---|---|
-| 1 | **Digital multimeter** (AstroAI / ANENG AN8008 class) | 1 | Non-negotiable. Sets and verifies the −5V VEE rail and contrast range; without it you are guessing at the one voltage that can kill an irreplaceable panel. You listed no DMM. | ~$20 | ~$20 | Amazon | Biggest single line in this tier. If you own one, the tier drops to ~$52 |
+| 1 | ~~Digital multimeter~~ | — | **Owned — not purchased.** Kept in the list because it is load-bearing: it sets and verifies the −5V VEE rail and the contrast sweep in Phase 1, and it is the diode-test instrument for confirming keyboard rollover orientation in Phase 2. | — | $0 | — | |
 | 2 | 74HCT245N, DIP-20 | 4 | 3.3V→5V outbound translation for D0–D7 and for E / R/W / C/D / RESET. HCT input thresholds (VIH 2.0V) accept 3.3V logic directly on a 5V rail — no dedicated translator IC required in this direction. 2 in use, 2 spare. | ✓$0.78–0.85 | ~$3.40 | DigiKey / Mouser | Buy spares; these are what you'll cook if you mis-wire |
 | 3 | 74LVC245AN, DIP-20 | 2 | 5V→3.3V inbound for data reads (busy flag, display RAM readback). Run at 3.3V; inputs are 5V tolerant. | ~$1.10 | ~$2.20 | DigiKey / Mouser | **Hard to source in DIP** — Nexperia DIP stock is thinning. Fallbacks: SOIC + breakout adapter (~$1 for 5 adapters, AliExpress), or 8× resistor dividers (1k/2k) which work fine at these speeds |
 | 4 | 74HCT595N, DIP-16 | 3 | The 10-bit CS chain (2 cascaded) that replaces 10 FPGA pins with 3. HCT again means no translator on the serial path. 1 spare. | ~$0.60 | ~$1.80 | DigiKey / Mouser | Per `00-cs-chain-finding.md`, this replaces the 74HC154 idea, which would break screen clear |
@@ -33,16 +33,19 @@ separately because they are not needed "before it displays a character."
 | 12 | Desoldering braid + manual solder sucker | 1 ea | You have no desoldering gear. This is the cheap substitute; the PCB-cutting strategy in `06-decisions.md` is what keeps it sufficient. | ~$8 | ~$8.00 | Amazon | |
 | 13 | 5V USB supply, 2 A, with a spare cable | 1 | Bench power for the Tang Nano + panel logic. Panel logic draws tens of mA, so the Nano's 5V pin can feed it — measure before you rely on it. | ~$8 | ~$8.00 | Amazon / on hand | |
 
-**Tier 1 subtotal: ~$84.40** — or **~$64** if you already have a multimeter,
-**~$54** if you also raid the donor board for passives and a trimpot.
+**Tier 1 subtotal: ~$64.40** — or **~$50** if you raid the donor board for
+passives, sockets and a trimpot before ordering.
 
-You said under $75. As listed it overruns by ~$9, entirely because of the
-multimeter. Options, in the order I'd take them: harvest passives and sockets
-from the donor board (−$10 to −$15), drop to two 74HCT245 and one 74HCT595 with
-no spares (−$2.50, and I would not — spares of the parts most likely to die are
-the best value on this list), or buy the $12 multimeter tier instead of the $20
-one (fine for DC rails; poorer on continuity beep responsiveness, which you will
-use constantly in Phase 0).
+**That fits your $75 with about $10 of headroom.** Spend it on **Tier 2 item 18,
+the LCD zebra strips (~$10–15)** — nothing else at that price protects as much
+project time. The classic M100 missing-columns fault is a contact fault, and
+having strips on hand turns "is this my CS decode?" into an hour's swap instead of
+a week of doubt (risk R4). If they come in over budget, harvesting the donor's
+passives covers the difference.
+
+Do **not** economise by dropping the spare 74HCT245/74HCT595 — those are the
+parts most likely to die during bring-up, they cost pennies, and a missing $0.60
+part stalls a whole evening.
 
 ---
 
@@ -80,9 +83,10 @@ use constantly in Phase 0).
 
 | Tier | Subtotal |
 |---|---|
-| Tier 1, bare minimum, to first character | **~$84** (~$64 with a DMM on hand) |
-| Tier 1 + 1b, complete machine in the case | **~$106** |
-| Tier 1 + 1b + Tier 2, comfortable | **~$300–480** |
+| Tier 1, bare minimum, to first character | **~$64** (~$50 harvesting donor passives) |
+| Tier 1 + zebra strips (recommended, uses the headroom) | **~$77** |
+| Tier 1 + 1b, complete machine in the case | **~$86** |
+| Tier 1 + 1b + Tier 2, comfortable | **~$280–460** |
 
 ---
 
